@@ -51,6 +51,7 @@ int state = 0;
 uint16_t press_button = 0;
 int LEDset = 0;
 int button = 1;
+int Hz = 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -114,6 +115,14 @@ int main(void)
 	static uint32_t timestamp = 0;
 	if(HAL_GetTick()>=timestamp)
 	{
+		if(Hz > 0)
+		{
+			LED_speed = 500/Hz; //1Hz = 500 ms, 2Hz = 250 ms
+		}
+		else
+		{
+			LED_speed = 0;
+		}
 		timestamp = HAL_GetTick()+LED_speed;
 		press_button = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
 		if (LEDset == 1)
@@ -338,14 +347,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			}
 			if(RxBuffer[0] == 97) //a
 			{
-				LED_speed += 1;
-				sprintf((char*)TxBuffer,"\r\nLED speed+1\r\n");
+				Hz += 1;
+				sprintf((char*)TxBuffer,"\r\nLED speed = %d\r\n", LED_speed);
 				break;
 			}
 			if(RxBuffer[0] == 115) //s
 			{
-				LED_speed -= 1;
-				sprintf((char*) TxBuffer, "\r\nLED speed-1\r\n");
+				Hz -= 1;
+				sprintf((char*) TxBuffer, "\r\nLED speed = %d\r\n", LED_speed);
 				break;
 			}
 			if(RxBuffer[0] == 100) //d
@@ -371,12 +380,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				state = 0;
 				break;
 			}
-//			if(press_button == 0) //z
-//			{
-//				button = 1;
-//				sprintf((char*)TxBuffer,"\r\nButton is pressed\r\n");
-//				break;
-//			}
 			else
 			{
 				sprintf((char*)TxBuffer,"\r\nWrong Button\r\n");
