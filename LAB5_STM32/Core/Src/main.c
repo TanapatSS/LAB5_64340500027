@@ -44,14 +44,15 @@ DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
-int LED_speed = 100;
+int LED_speed = 500;
 uint8_t RxBuffer[1];
 uint8_t TxBuffer[1000];
 int state = 0;
-uint16_t press_button = 0;
+int press_button = 0;
 int LEDset = 0;
 int button = 1;
 int Hz = 1;
+int press = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,17 +116,8 @@ int main(void)
 	static uint32_t timestamp = 0;
 	if(HAL_GetTick()>=timestamp)
 	{
-		if(Hz > 0)
-		{
-			LED_speed = 500/Hz; //1Hz = 500 ms, 2Hz = 250 ms
-		}
-		else
-		{
-			LED_speed = 0;
-		}
 		timestamp = HAL_GetTick()+LED_speed;
-		press_button = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
-		if (LEDset == 1)
+		if (LEDset == 0)
 		{
 			HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin);
 		}
@@ -134,10 +126,22 @@ int main(void)
 			HAL_GPIO_WritePin(LD2_GPIO_Port,LD2_Pin,0);
 		}
 	}
-	if(press_button == 0 && button == 1 && state == 2)
+	press_button = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
+	if(press_button == 0 && button == 1 && state == 2 && press == 0)
 	{
-		sprintf((char*)TxBuffer,"\r\nButton is pressed\r\n");
-		HAL_UART_Transmit_IT(&huart2, TxBuffer, strlen((char*) TxBuffer));
+		sprintf((char*)TxBuffer,"\r\n---------------------------------------------------\r\n"
+								"0o  Button is pressed  o0\r\n"
+								"---------------------------------------------------\r\n");
+		HAL_UART_Transmit(&huart2, TxBuffer, strlen((char*) TxBuffer),1000);
+		press = 1;
+	}
+	else if(press_button == 1 && button == 1 && state == 2 && press == 1)
+	{
+		sprintf((char*)TxBuffer,"\r\n---------------------------------------------------\r\n"
+								"0o  Button is unpressed  o0\r\n"
+								"---------------------------------------------------\r\n");
+		HAL_UART_Transmit(&huart2, TxBuffer, strlen((char*) TxBuffer),1000);
+		press = 0;
 	}
 	button = press_button;
   }
@@ -208,7 +212,7 @@ static void MX_USART2_UART_Init(void)
   huart2.Instance = USART2;
   huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_9B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.StopBits = UART_STOPBITS_2;
   huart2.Init.Parity = UART_PARITY_EVEN;
   huart2.Init.Mode = UART_MODE_TX_RX;
   huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
@@ -305,87 +309,135 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if(huart == &huart2)
 	{
+
 		RxBuffer[1] = '\0';
 		switch (state)
 		{
 		case 0:
 			if (RxBuffer[0] == 48) //0
 			{
-				sprintf((char*)TxBuffer,"\r\n---------------------------------------------------\r\n"
+				sprintf((char*)TxBuffer,"\r\nReceived : %s\r\n"
+										    "---------------------------------------------------\r\n"
 											"-->press a to speed up +1Hz\r\n"
 											"-->press s to speed down -1Hz\r\n"
 											"-->press d to On/Off LED\r\n"
 											"-->press x to go back\r\n"
-											"---------------------------------------------------\r\n");
+											"---------------------------------------------------\r\n",RxBuffer);
 				state = 1;
 				break;
 			}
 			if(RxBuffer[0] == 49) //1
 			{
-				sprintf((char*) TxBuffer,"\r\n---------------------------------------------------\r\n"
+				sprintf((char*) TxBuffer,"\r\nReceived : %s\r\n"
+										     "---------------------------------------------------\r\n"
 											 "-->press a blue button to show status\r\n"
 										     "-->press x to go back\r\n"
-											 "---------------------------------------------------\r\n");
+											 "---------------------------------------------------\r\n",RxBuffer);
 				state = 2;
 				break;
 			}
 			if(RxBuffer[0] != 48 || RxBuffer[0] != 49)
 			{
-				sprintf((char*) TxBuffer, "\r\nWrong Button\r\n");
+				sprintf((char*) TxBuffer, "\r\nReceived : %s\r\n"
+										  "---------------------------------------------------\r\n"
+										  "xxx Wrong Button xxx\r\n"
+										  "---------------------------------------------------\r\n",RxBuffer);
 				break;
 			}
 		case 1:
 			if (RxBuffer[0] == 120) //x
 			{
-				sprintf((char*)TxBuffer,"---------------------------------------------------\r\n"
+				sprintf((char*)TxBuffer,"\r\nReceived : %s\r\n"
+										"---------------------------------------------------\r\n"
 										"*Welcome to LED speed control application*\r\n"
 										"-->press 0 to enter LED control\r\n"
 										"-->press 1 to enter button status\r\n"
-										"---------------------------------------------------\r\n");
+										"---------------------------------------------------\r\n",RxBuffer);
 				state = 0;
 				break;
 			}
 			if(RxBuffer[0] == 97) //a
 			{
 				Hz += 1;
-				sprintf((char*)TxBuffer,"\r\nLED speed = %d\r\n", LED_speed);
+				if(Hz > 0)
+				{
+					LED_speed = 500/Hz; //1Hz = 500 ms, 2Hz = 250 ms
+				}
+				else
+				{
+					LED_speed = 0;
+				}
+				sprintf((char*)TxBuffer,"\r\nReceived : %s\r\n"
+										"---------------------------------------------------\r\n"
+										"LED speed = %d\r\n"
+										"---------------------------------------------------\r\n", RxBuffer, LED_speed);
 				break;
 			}
 			if(RxBuffer[0] == 115) //s
 			{
 				Hz -= 1;
-				sprintf((char*) TxBuffer, "\r\nLED speed = %d\r\n", LED_speed);
+				if(Hz > 0)
+				{
+					LED_speed = 500/Hz; //1Hz = 500 ms, 2Hz = 250 ms
+				}
+				else
+				{
+					LED_speed = 0;
+				}
+				sprintf((char*) TxBuffer,"\r\nReceived : %s\r\n"
+										 "---------------------------------------------------\r\n"
+										 "LED speed = %d\r\n"
+										 "---------------------------------------------------\r\n", RxBuffer, LED_speed);
 				break;
 			}
 			if(RxBuffer[0] == 100) //d
 			{
-				sprintf((char*) TxBuffer, "\r\nLED Toggle\r\n");
-				if(LEDset == 0)LEDset = 1;
-				else if(LEDset == 1)LEDset = 0;
+				if(LEDset == 1)
+				{
+					sprintf((char*) TxBuffer, "\r\nReceived : %s\r\n"
+											  "---------------------------------------------------\r\n"
+											  "LED ON\r\n"
+											  "---------------------------------------------------\r\n", RxBuffer);
+					LEDset = 0;
+				}
+				else if(LEDset == 0)
+				{
+					sprintf((char*) TxBuffer, "\r\nReceived : %s\r\n"
+											  "---------------------------------------------------\r\n"
+											  "LED OFF\r\n"
+											  "---------------------------------------------------\r\n", RxBuffer);
+					LEDset = 1;
+				}
 				break;
 			}
 			else
 			{
-				sprintf((char*) TxBuffer, "\r\nWrong Button\r\n");
+				sprintf((char*) TxBuffer, "\r\nReceived : %s\r\n"
+										  "---------------------------------------------------\r\n"
+										  "xxx Wrong Button xxx\r\n"
+										  "---------------------------------------------------\r\n",RxBuffer);
 				break;
 			}
 		case 2:
 			if(RxBuffer[0] == 120) //x
 			{
-				sprintf((char*)TxBuffer,"---------------------------------------------------\r\n"
+				sprintf((char*)TxBuffer,"\r\nReceived : %s\r\n"
+										"---------------------------------------------------\r\n"
 										"*Welcome to LED speed control application*\r\n"
 										"-->press 0 to enter LED control\r\n"
 										"-->press 1 to enter button status\r\n"
-										"---------------------------------------------------\r\n");
+										"---------------------------------------------------\r\n",RxBuffer);
 				state = 0;
 				break;
 			}
 			else
 			{
-				sprintf((char*)TxBuffer,"\r\nWrong Button\r\n");
+				sprintf((char*) TxBuffer, "\r\nReceived : %s\r\n"
+										  "---------------------------------------------------\r\n"
+										  "xxx Wrong Button xxx\r\n"
+										  "---------------------------------------------------\r\n",RxBuffer);
 				break;
 			}
-//			Prebutton
 		}
 		HAL_UART_Transmit_IT(&huart2, TxBuffer, strlen((char*) TxBuffer));
 		HAL_UART_Receive_IT(&huart2, RxBuffer, 1);
